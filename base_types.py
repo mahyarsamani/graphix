@@ -4,7 +4,7 @@ from typing import final, List, Set
 from .singleton_meta import SingletonMeta
 
 
-class GroupNode:
+class Node:
     _instance_number = -1
 
     @classmethod
@@ -15,10 +15,10 @@ class GroupNode:
     def __init__(self, name: str, path: str) -> None:
         self._name = name
         self._path = path.lstrip(".")
-        self._id = GroupNode.get_id()
+        self._id = Node.get_id()
         self._children = []
 
-    def add_child(self, child: "GroupNode") -> None:
+    def add_child(self, child: "Node") -> None:
         self._children.append(child)
 
     def name(self) -> str:
@@ -30,34 +30,34 @@ class GroupNode:
     def id(self) -> int:
         return self._id
 
-    def children(self) -> List["GroupNode"]:
+    def children(self) -> List["Node"]:
         return self._children
 
-    def __eq__(self, other: "GroupNode") -> bool:
+    def __eq__(self, other: "Node") -> bool:
         return self._path == other.path()
 
-    def __lt__(self, other: "GroupNode") -> bool:
+    def __lt__(self, other: "Node") -> bool:
         return len(self._path.split(".")) < len(other.path().split("."))
 
-    def __gt__(self, other: "GroupNode") -> bool:
+    def __gt__(self, other: "Node") -> bool:
         return len(self._path.split(".")) > len(other.path().split("."))
 
     def __hash__(self) -> int:
         return hash(self._path)
 
     def __str__(self) -> str:
-        return f"GroupNode(name: {self._name}, path: {self._path}, children: {self._children})"
+        return self._name
 
     def __repr__(self) -> str:
         return self.__str__()
 
 
-class AggregatorNode(GroupNode, metaclass=SingletonMeta):
+class AggregatorNode(Node, metaclass=SingletonMeta):
     def __init__(self, name: str, path: str) -> None:
         super().__init__(name, path)
 
     @final
-    def add_child(self, child: GroupNode) -> None:
+    def add_child(self, child: Node) -> None:
         raise RuntimeError("You should not add a child to an AggregatorNode.")
 
     @abstractmethod
@@ -65,7 +65,7 @@ class AggregatorNode(GroupNode, metaclass=SingletonMeta):
         raise NotImplementedError
 
     def __str__(self) -> str:
-        return f"AggregatorNode(name: {self._name}, path: {self._path})"
+        return self._name
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -80,14 +80,14 @@ class Stat:
         self._parents = []
 
     @abstractmethod
-    def process_dict(self, parent: GroupNode, key: str, value: dict) -> None:
+    def process_dict(self, parent: Node, key: str, value: dict) -> None:
         raise NotImplementedError
 
     @abstractmethod
     def filter_parents(
         self,
-        these_parents: Set[GroupNode],
-        not_these_parents: Set[GroupNode],
+        these_parents: Set[Node],
+        not_these_parents: Set[Node],
     ) -> "Stat":
         raise NotImplementedError
 
@@ -108,7 +108,7 @@ class Stat:
     def value(self) -> dict:
         return self._value
 
-    def parents(self) -> List[GroupNode]:
+    def parents(self) -> List[Node]:
         return self._parents
 
     def __str__(self) -> str:
@@ -120,7 +120,7 @@ class Stat:
     def _set_value(self, value: dict) -> None:
         self._value = value
 
-    def _set_parents(self, parents: List[GroupNode]) -> None:
+    def _set_parents(self, parents: List[Node]) -> None:
         self._parents = parents
 
     def __add__(self, other: "Stat") -> "Stat":

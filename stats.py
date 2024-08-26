@@ -1,7 +1,7 @@
 from typing import List, Set, Union
 from warnings import warn
 
-from .base_types import AggregatorNode, GroupNode, Stat
+from .base_types import AggregatorNode, Node, Stat
 from .compare_util import BiggestThing, SmallestThing
 
 
@@ -9,14 +9,14 @@ class Scalar(Stat):
     def __init__(self, index: dict, name: str) -> None:
         super().__init__(index, name, "Scalar")
 
-    def process_dict(self, parent: GroupNode, key: str, value: dict) -> None:
+    def process_dict(self, parent: Node, key: str, value: dict) -> None:
         assert self._name == key
         self._value[parent] = value["value"]
         self._parents.append(parent)
 
     def filter_parents(
-        self, these_parents: Set[GroupNode], not_these_parents: Set[GroupNode]
-    ) -> List[GroupNode]:
+        self, these_parents: Set[Node], not_these_parents: Set[Node]
+    ) -> List[Node]:
         if these_parents and not_these_parents:
             raise ValueError(
                 "Either these_parents or not_these_parents should be empty"
@@ -346,7 +346,7 @@ class Distribution(Stat):
     def __init__(self, index: dict, name: str) -> None:
         super().__init__(index, name, "Distribution")
 
-    def process_dict(self, parent: GroupNode, key: str, value: dict) -> None:
+    def process_dict(self, parent: Node, key: str, value: dict) -> None:
         assert self._name == key
         assert value["num_bins"] == len(value["value"])
         bin_size = value["bin_size"]
@@ -361,7 +361,7 @@ class Distribution(Stat):
         self._parents.append(parent)
 
     def filter_parents(
-        self, these_parents: Set[GroupNode], not_these_parents: Set[GroupNode]
+        self, these_parents: Set[Node], not_these_parents: Set[Node]
     ) -> Stat:
         if these_parents and not_these_parents:
             raise ValueError(
@@ -381,7 +381,7 @@ class Distribution(Stat):
 
     def aggregate_using(
         self,
-        aggregator_node: "AggregatorNode",
+        aggregator_node: AggregatorNode,
     ) -> None:
         return aggregator_node.aggregate(self)
 
@@ -407,3 +407,6 @@ class Distribution(Stat):
 
     def __mod__(self, other: Stat) -> Stat:
         raise RuntimeError("You should not mod two Distribution stats.")
+
+
+# TODO: Add class for Vector stats.

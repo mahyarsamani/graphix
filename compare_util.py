@@ -5,7 +5,7 @@ from typing import Any
 from .singleton_meta import SingletonMeta
 
 
-class Thing(metaclass=SingletonMeta):
+class ComparableThing(metaclass=SingletonMeta):
     def __eq__(self, other: Any) -> bool:
         return other is self
 
@@ -24,7 +24,7 @@ class Thing(metaclass=SingletonMeta):
         return self.__lt__() or self.__eq__()
 
 
-class SmallestThing(Thing):
+class SmallestThing(ComparableThing):
     def __gt__(self, other: Any) -> bool:
         return False
 
@@ -32,7 +32,7 @@ class SmallestThing(Thing):
         return True
 
 
-class BiggestThing(Thing):
+class BiggestThing(ComparableThing):
     def __gt__(self, other: Any) -> bool:
         return True
 

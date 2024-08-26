@@ -9,7 +9,7 @@ from .stats import Distribution, Scalar
 
 class SummationAggregator(AggregatorNode):
     def __init__(self) -> None:
-        super().__init__("SummationAggregator", "Stats::SummationAggregator")
+        super().__init__("Sum", "Stats::SummationAggregator")
 
     def aggregate(self, stat: Scalar) -> Scalar:
         if not isinstance(stat, Scalar):
@@ -31,9 +31,7 @@ class SummationAggregator(AggregatorNode):
 
 class ArithmeticMeanAggregator(AggregatorNode):
     def __init__(self) -> None:
-        super().__init__(
-            "ArithmeticMeanAggregator", "Stats::ArithmeticMeanAggregator"
-        )
+        super().__init__("ArithMean", "Stats::ArithmeticMeanAggregator")
 
     def aggregate(self, stat: Scalar) -> Scalar:
         if not isinstance(stat, Scalar):
@@ -55,9 +53,7 @@ class ArithmeticMeanAggregator(AggregatorNode):
 
 class GeometricMeanAggregator(AggregatorNode):
     def __init__(self) -> None:
-        super().__init__(
-            "GeometricMeanAggregator", "Stats::GeometricMeanAggregator"
-        )
+        super().__init__("GeoMean", "Stats::GeometricMeanAggregator")
 
     def aggregate(self, stat: Scalar) -> Scalar:
         if not isinstance(stat, Scalar):
@@ -79,7 +75,7 @@ class GeometricMeanAggregator(AggregatorNode):
 
 class MinAggregator(AggregatorNode):
     def __init__(self) -> None:
-        super().__init__("MinAggregator", "Stats::MinAggregator")
+        super().__init__("Min", "Stats::MinAggregator")
 
     def aggregate(self, stat: Scalar) -> Scalar:
         if not isinstance(stat, Scalar):
@@ -100,7 +96,7 @@ class MinAggregator(AggregatorNode):
 # This is the best aggregator ever
 class MaxAggregator(AggregatorNode):
     def __init__(self) -> None:
-        super().__init__("MaxAggregator", "Stats::MaxAggregator")
+        super().__init__("Max", "Stats::MaxAggregator")
 
     def aggregate(self, stat: Scalar) -> Scalar:
         if not isinstance(stat, Scalar):
@@ -120,7 +116,7 @@ class MaxAggregator(AggregatorNode):
 
 class CombineAggregator(AggregatorNode):
     def __init__(self) -> None:
-        super().__init__("CombineAggregator", "Stats::CombineAggregator")
+        super().__init__("All", "Stats::CombineAggregator")
 
     def aggregate(self, stat: Distribution) -> Distribution:
         if not isinstance(stat, Distribution):
@@ -159,7 +155,12 @@ class CombineAggregator(AggregatorNode):
                 if overlap_0 == 0 and overlap_1 == 0:
                     raise RuntimeError(
                         "The bucket does not overlap with any of the buckets.\n"
-                        f"to_merge: {bucket}, buckets[{index_0}]: {buckets[index_0]}, buckets[{index_1}]: {buckets[index_1]}"
+                        "Here are some useful information:\n"
+                        f"min_start: {min_start}, max_end: {max_end}, "
+                        f"bin_size: {bin_size}, num_bins: {num_bins}\n"
+                        f"to_merge: {bucket}\n"
+                        f"candidate_0: buckets[{index_0}]: {buckets[index_0]}\n"
+                        f"candidate_1: buckets[{index_1}]: {buckets[index_1]}"
                     )
                 index = index_0 if overlap_0 > overlap_1 else index_1
                 buckets[index].combine_with(bucket)
