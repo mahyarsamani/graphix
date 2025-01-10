@@ -119,6 +119,20 @@ class Scalar(Stat):
         else:
             raise ValueError("You can only subtract a Scalar or a number.")
 
+    def __rsub__(self, other: Union["Scalar", int, float]) -> "Scalar":
+        if isinstance(other, Stat):
+            other.__sub__(self)
+        elif isinstance(other, (int, float)):
+            new_value = dict()
+            for parent in self._parents:
+                new_value[parent] = other - self._value[parent]
+            to_ret = Scalar(self._index, f"({other} - {self._name})")
+            to_ret._set_value(new_value)
+            to_ret._set_parents(list(new_value.keys()))
+            return to_ret
+        else:
+            raise ValueError("You can only subtract a Scalar or a number.")
+
     def __mul__(self, other: Union["Scalar", int, float]) -> "Scalar":
         if isinstance(other, Stat):
             if not isinstance(other, Scalar):
@@ -386,27 +400,42 @@ class Distribution(Stat):
         return aggregator_node.aggregate(self)
 
     def __add__(self, other: "Distribution") -> "Distribution":
-        raise RuntimeError("You should not add two Distribution stats.")
+        raise RuntimeError(
+            "Addition operator not defined for Distribution Stat."
+        )
 
     def __sub__(self, other: Stat) -> Stat:
-        raise RuntimeError("You should not subtract two Distribution stats.")
+        raise RuntimeError(
+            "Subtraction operator not defined for Distribution Stat."
+        )
+
+    def __rsub__(self, other: Stat) -> Stat:
+        raise RuntimeError(
+            "r Subtraction operator not defined for Distribution Stat."
+        )
 
     def __mul__(self, other: Stat) -> Stat:
-        raise RuntimeError("You should not multiply two Distribution stats.")
+        raise RuntimeError(
+            "Multiplication operator not defined for Distribution Stat."
+        )
 
     def __truediv__(self, other: Stat) -> Stat:
-        raise RuntimeError("You should not divide two Distribution stats.")
+        raise RuntimeError(
+            "Division operator not defined for Distribution Stat."
+        )
 
     def __floordiv__(self, other: Stat) -> Stat:
         raise RuntimeError(
-            "You should not floor divide two Distribution stats."
+            "Integer Division operator not defined for Distribution Stat."
         )
 
     def __pow__(self, other: Stat) -> Stat:
-        raise RuntimeError("You should not power two Distribution stats.")
+        raise RuntimeError("Power operator not defined for Distribution Stat.")
 
     def __mod__(self, other: Stat) -> Stat:
-        raise RuntimeError("You should not mod two Distribution stats.")
+        raise RuntimeError(
+            "Modulus operator not defined for Distribution Stat."
+        )
 
 
 # TODO: Add class for Vector stats.
