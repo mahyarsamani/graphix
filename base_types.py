@@ -33,20 +33,45 @@ class Node:
     def children(self) -> List["Node"]:
         return self._children
 
+    def get_maximal_match_descendent_from_tokenized_first_column(
+        self, names: list[str]
+    ) -> "Node":
+        def _find_child_by_name(name: str, children) -> "Node":
+            ret = None
+            for child in self._children:
+                if child.name() == name:
+                    ret = child
+                    break
+            return ret
+
+        potential_child = _find_child_by_name(names[0], self._children)
+        if len(names) == 1:
+            if potential_child is not None:
+                return potential_child
+            else:
+                return self
+        else:
+            if potential_child is not None:
+                return potential_child.get_maximal_match_descendent_from_tokenized_first_column(
+                    names[1:]
+                )
+            else:
+                return self
+
     def __eq__(self, other: "Node") -> bool:
         return self._path == other.path()
 
     def __lt__(self, other: "Node") -> bool:
-        return len(self._path.split(".")) < len(other.path().split("."))
+        return self._path < other.path()
 
     def __gt__(self, other: "Node") -> bool:
-        return len(self._path.split(".")) > len(other.path().split("."))
+        return self._path > other.path()
 
     def __hash__(self) -> int:
         return hash(self._path)
 
     def __str__(self) -> str:
-        return self._name
+        return self._path
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -72,12 +97,28 @@ class AggregatorNode(Node, metaclass=SingletonMeta):
 
 
 class Stat:
+    @classmethod
+    @abstractmethod
+    def match_stat_line_wo_parent_path(cls, stat_name: str) -> bool:
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def get_stat_name_from_line_wo_parent_path(
+        cls, line_wo_parent_path: str
+    ) -> str:
+        raise NotImplementedError
+
     def __init__(self, index: dict, name: str, type: str) -> None:
         self._index = index
         self._name = name
         self._type = type
         self._value = dict()
         self._parents = []
+
+    @abstractmethod
+    def process_lines(self, parent: Node, lines: List[str]) -> None:
+        raise NotImplementedError
 
     @abstractmethod
     def process_dict(self, parent: Node, key: str, value: dict) -> None:

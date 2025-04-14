@@ -1,5 +1,4 @@
 from matplotlib import colors as mcolors
-from typing import List
 
 colors = [
     "darkorange",

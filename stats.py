@@ -1,13 +1,43 @@
-from typing import List, Set, Union
+import re
+
+from typing import List, Set, Tuple, Union
 from warnings import warn
 
 from .base_types import AggregatorNode, Node, Stat
-from .compare_util import BiggestThing, SmallestThing
+
+
+def find_matching_stat_class_from_line_wo_parent_path(
+    line_wo_parent: str,
+) -> type[Stat]:
+    if Scalar.match_stat_line_wo_parent_path(line_wo_parent):
+        return Scalar
+    if Distribution.match_stat_line_wo_parent_path(line_wo_parent):
+        return Distribution
+    return None
 
 
 class Scalar(Stat):
+    @classmethod
+    def match_stat_line_wo_parent_path(cls, name: str) -> bool:
+        pattern = r"\w+\s+\d+(?:\.\d+)?\s+(# .+|\(Unspecified\))"
+        return bool(re.fullmatch(pattern, name))
+
+    @classmethod
+    def get_stat_name_from_line_wo_parent_path(
+        cls, line_wo_parent_path: str
+    ) -> str:
+        return line_wo_parent_path.split()[0]
+
     def __init__(self, index: dict, name: str) -> None:
         super().__init__(index, name, "Scalar")
+
+    def process_line(self, parent: Node, line: str) -> None:
+        name, value = line.split()[:2]
+        assert (
+            name == self._name
+        ), f"Name {name} does not match self._name {self._name}"
+        self._value[parent] = float(value)
+        self._parents.append(parent)
 
     def process_dict(self, parent: Node, key: str, value: dict) -> None:
         assert self._name == key
@@ -24,9 +54,9 @@ class Scalar(Stat):
 
         new_value = dict()
         for parent, value in self._value.items():
-            if not these_parents and parent in these_parents:
+            if these_parents and parent in these_parents:
                 new_value[parent] = value
-            if not not_these_parents and parent not in not_these_parents:
+            if not_these_parents and parent not in not_these_parents:
                 new_value[parent] = value
         to_ret = Scalar(self._index, self._name)
         to_ret._set_value(new_value)
@@ -320,6 +350,17 @@ class Scalar(Stat):
 
 
 class Distribution(Stat):
+    @classmethod
+    def match_stat_line_wo_parent_path(cls, name: str) -> bool:
+        pattern = r"\w+::(?:\d+-\d+|\d+)\s+\d+(?:\.\d+)?(?:\s+\d+\.\d+%\s+\d+\.\d+%)?\s+(?:# .+|\(Unspecified\))"
+        return bool(re.fullmatch(pattern, name))
+
+    @classmethod
+    def get_stat_name_from_line_wo_parent_path(
+        cls, line_wo_parent_path: str
+    ) -> str:
+        return line_wo_parent_path.split()[0].split("::")[0]
+
     class Bucket:
         def __init__(self, start: int, end: int, freq: int) -> None:
             self._start = start
@@ -360,6 +401,21 @@ class Distribution(Stat):
     def __init__(self, index: dict, name: str) -> None:
         super().__init__(index, name, "Distribution")
 
+    def process_line(self, parent: Node, line: str) -> None:
+        name, rest = line.split("::")
+        bucket, freq = rest.split()[:2]
+        if not re.match(r"\d+-\d+", bucket):
+            start = int(bucket)
+            end = start + 1
+        else:
+            start, end = map(int, bucket.split("-"))
+        assert (
+            name == self._name
+        ), f"Name {name} does not match self._name {self._name}"
+        if not parent in self._value:
+            self._value[parent] = []
+        self._value[parent].append(Distribution.Bucket(start, end, int(freq)))
+
     def process_dict(self, parent: Node, key: str, value: dict) -> None:
         assert self._name == key
         assert value["num_bins"] == len(value["value"])
@@ -398,6 +454,16 @@ class Distribution(Stat):
         aggregator_node: AggregatorNode,
     ) -> None:
         return aggregator_node.aggregate(self)
+
+    def get_buckets_for_parent(self, parent: Node) -> List[Tuple[int, int]]:
+        value = self._value[parent]
+        return [
+            (bucket.lower_bound(), bucket.upper_bound()) for bucket in value
+        ]
+
+    def get_freqs_for_parent(self, parent: Node) -> List[int]:
+        value = self._value[parent]
+        return [bucket.freq() for bucket in value]
 
     def __add__(self, other: "Distribution") -> "Distribution":
         raise RuntimeError(

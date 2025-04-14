@@ -1,4 +1,3 @@
-from typing import List
 from warnings import warn
 
 from .base_types import Node
