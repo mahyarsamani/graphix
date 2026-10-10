@@ -13,6 +13,8 @@ def find_matching_stat_class_from_line_wo_parent_path(
         return Scalar
     if Distribution.match_stat_line_wo_parent_path(line_wo_parent):
         return Distribution
+    if VectorOfDistribution.match_stat_line_wo_parent_path(line_wo_parent):
+        return VectorOfDistribution
     return None
 
 
@@ -505,3 +507,35 @@ class Distribution(Stat):
 
 
 # TODO: Add class for Vector stats.
+class VectorOfDistribution(Distribution):
+    @classmethod
+    def match_stat_line_wo_parent_path(cls, name: str) -> bool:
+        pattern = r"\w+\.\w+::(?:\d+-\d+|\d+)\s+\d+(?:\.\d+)?(?:\s+\d+\.\d+%\s+\d+\.\d+%)?\s+(?:# .+|\(Unspecified\))"
+        return bool(re.fullmatch(pattern, name))
+
+    @classmethod
+    def get_stat_name_from_line_wo_parent_path(
+        cls, line_wo_parent_path: str
+    ) -> str:
+        return "_".join(
+            line_wo_parent_path.split()[0].split("::")[0].split(".")
+        )
+
+    def __init__(self, index: dict, name: str) -> None:
+        super().__init__(index, name)
+
+    def process_line(self, parent: Node, line: str) -> None:
+        name, rest = line.split("::")
+        name = "_".join(name.split("."))
+        bucket, freq = rest.split()[:2]
+        if not re.match(r"\d+-\d+", bucket):
+            start = int(bucket)
+            end = start + 1
+        else:
+            start, end = map(int, bucket.split("-"))
+        assert (
+            name == self._name
+        ), f"Name {name} does not match self._name {self._name}"
+        if not parent in self._value:
+            self._value[parent] = []
+        self._value[parent].append(Distribution.Bucket(start, end, int(freq)))

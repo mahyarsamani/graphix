@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import final, List, Set
+from typing import Any, final, List, Set
 
 from .singleton_meta import SingletonMeta
 
@@ -17,6 +17,7 @@ class Node:
         self._path = path.lstrip(".")
         self._id = Node.get_id()
         self._children = []
+        self._params = dict()
 
     def add_child(self, child: "Node") -> None:
         self._children.append(child)
@@ -32,6 +33,25 @@ class Node:
 
     def children(self) -> List["Node"]:
         return self._children
+
+    def set_params(self, params: dict) -> None:
+        self._params = params
+
+    def __getattr__(self, name):
+        def _find_child_by_name(name: str, children) -> "Node":
+            ret = None
+            for child in children:
+                if child.name() == name:
+                    ret = child
+                    break
+            return ret
+
+        if name in self._params:
+            return self._params[name]
+        elif _find_child_by_name(name, self._children) is not None:
+            return _find_child_by_name(name, self._children)
+        else:
+            super().__getattr__(name)
 
     def get_maximal_match_descendent_from_tokenized_first_column(
         self, names: list[str]
@@ -143,6 +163,9 @@ class Stat:
     def index(self) -> dict:
         return self._index
 
+    def rename(self, name: str) -> None:
+        self._name = name
+
     def name(self) -> str:
         return self._name
 
@@ -151,6 +174,13 @@ class Stat:
 
     def parents(self) -> List[Node]:
         return self._parents
+
+    def as_list_of_rows(self) -> List[List[Any]]:
+        rows = [[key for key in self._index.keys()] + ["parent", self._name]]
+        index_values = [key for key in self._index.values()]
+        for parent, value in self._value.items():
+            rows.append(index_values + [parent, value])
+        return rows
 
     def __str__(self) -> str:
         return f"{self._type}(name: {self._name}, value: {self._value})"

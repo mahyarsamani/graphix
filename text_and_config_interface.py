@@ -1,6 +1,7 @@
 import subprocess
 
 from pathlib import Path
+from typing import List, Optional
 from warnings import warn
 
 from .base_types import Node
@@ -21,6 +22,7 @@ def parse_config_json(root: Node, config_json: dict) -> None:
             _is_sim_object(item) for item in value
         )
 
+    params = dict()
     for key, value in config_json.items():
         if _is_sim_object(value):
             assert key == value["name"], f"key: {key}, value: {value}"
@@ -38,10 +40,17 @@ def parse_config_json(root: Node, config_json: dict) -> None:
                 node = Node(name, path)
                 root.add_child(node)
                 parse_config_json(node, item)
+        if not _is_sim_object(value) and not _is_sim_object_vector(value):
+            params[key] = value
+    root.set_params(params)
 
 
 def parse_stats_txt(
-    index: dict, root: Node, stats_txt_path: Path, dump_version_to_proces: int
+    index: dict,
+    root: Node,
+    stats_txt_path: Path,
+    dump_version_to_process: int,
+    custom_stats_classes: Optional[List[type]] = None,
 ) -> None:
     def _find_string_locations(file_path: Path, search_string: str):
         result = subprocess.run(
@@ -66,21 +75,21 @@ def parse_stats_txt(
             f"Number of begin and end locations do not match: {begin_locations}, {end_locations}"
         )
 
-    # NOTE: Author is quircky and does not like treating things that are logically
-    # equal differently. So I average them into a new variable num_dumps_found.
-    num_dumps_found = (len(begin_locations) + len(end_locations)) // 2
-    if dump_version_to_proces >= num_dumps_found:
-        raise ValueError(
-            f"Dump version {dump_version_to_proces} is bigger than the total number of dumps {num_dumps_found}."
-        )
-
     # NOTE: Since these line numbers are returned by grep (i.e. the numbers
     # start from 1 instead of 0), we need to subtract 1 to convert them to
     # 0-based. However, since we don't want to process the Begin and End lines,
     # we don't need to add 1 to the start and since slice operator is exclusive
     # of the end index, we don't need to subtract 1 from the end.
-    start_index = begin_locations[dump_version_to_proces]
-    end_index = end_locations[dump_version_to_proces]
+    # NOTE: Author is quircky and does not like treating things that are logically
+    # equal differently. So I average them into a new variable num_dumps_found.
+    num_dumps_found = (len(begin_locations) + len(end_locations)) // 2
+    try:
+        start_index = begin_locations[dump_version_to_process]
+        end_index = end_locations[dump_version_to_process]
+    except IndexError:
+        raise ValueError(
+            f"Dump version {dump_version_to_process} is bigger than the total number of dumps {num_dumps_found}."
+        )
     ret = dict()
     with open(stats_txt_path, "r") as stats_txt_file:
         lines = stats_txt_file.readlines()[start_index:end_index]
@@ -99,9 +108,17 @@ def parse_stats_txt(
                 line_wo_parent_path
             )
         )
+        if matching_stat_class is None and custom_stats_classes is not None:
+            for custom_stat_class in custom_stats_classes:
+                if custom_stat_class.match_stat_line_wo_parent_path(
+                    line_wo_parent_path
+                ):
+                    matching_stat_class = custom_stat_class
+                    break
         if matching_stat_class is None:
             warn(
-                f"Skipping stat line {line} since it does not match any stat class."
+                f"Could not find a matching stat class for line: {line_wo_parent_path}. "
+                "This may be due to a missing stat class or an unsupported stat format."
             )
             continue
         stat_name = matching_stat_class.get_stat_name_from_line_wo_parent_path(
