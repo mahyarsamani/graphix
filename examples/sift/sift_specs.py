@@ -90,9 +90,12 @@ HOV = [
 ]
 
 # Per access name, since gem5 build v2: hits, misses and allocated bytes
-# of every CacheMemory (`other` is an unlabelled access). hov accesses are
-# named hov<p>_index and hov<p>_data by side-car entry p; the checkpoint
-# manifest's `hov_entries` maps p to the index and data arrays.
+# of every CacheMemory (`other` is an unlabelled access). hov accesses
+# carry the arrays' names when the restore registered the manifest's
+# `hov_entries` with the cores, else hov<p>_index and hov<p>_data.
+# demand* excludes hov accesses: index* counts index accesses (uop0),
+# idr* the IDRs, gather* the Gather Unit's lookups of a notification's
+# index line (a miss fetches the line).
 PER_NAME = [
     gx.StatSpec(
         f"{family}.{{accessor}}",
@@ -106,6 +109,15 @@ PER_NAME = [
         ("demandMisses", "Count", "Demand misses per access name"),
         ("prefetchHits", "Count", "Prefetch hits per access name"),
         ("prefetchMisses", "Count", "Prefetch misses per access name"),
+        ("indexHits", "Count", "Index access (uop0) hits per access name"),
+        ("indexMisses", "Count",
+         "Index access (uop0) misses per access name"),
+        ("idrHits", "Count", "IDR hits per access name"),
+        ("idrMisses", "Count", "IDR misses per access name"),
+        ("gatherHits", "Count",
+         "Gather Unit index line lookups with the data here"),
+        ("gatherMisses", "Count",
+         "Gather Unit index line lookups that fetched the line"),
         ("bytesAllocated", "Byte",
          "Bytes of blocks allocated (brought in and kept) per access name"),
     ]
