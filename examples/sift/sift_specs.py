@@ -11,6 +11,9 @@ pass them to `RunSet.from_dirs(..., specs=SIFT_SPECS)`.
 | `CacheMemory.cc` | `bytesTransferred[<label>][<dst>]` (runs before 2026-10) | Scalar `bytesTransferred`, dims `label`, `dst` |
 | `Sequencer.cc` | `indRel{,Prod,Cons}AccLat.<consumer>[<producer>]<instance>` | Histogram `indRelAccLat`, dims `role`, `consumer`, `producer`, `instance` |
 | `Sequencer.cc` | `hovLdindE2ELatency`, `hovLdindUnmatched`, `hovLdindStale` | Histogram and Scalars (current runs only) |
+| `Sequencer.cc` | `hovValueChecks`, `hovValueMismatches`, `hovIndexChecks`, `hovIndexMismatches`, `hovChecksUnchecked` | Scalars (build v2) |
+| `CacheMemory.cc` | `{demand,prefetch,index,idr,gather}{Hits,Misses}.<accessor>`, `bytesAllocated.<accessor>` | Scalars, dim `accessor` (build v2) |
+| `base.cc` (O3 commit) | `commitStats<t>.committed{Loads,Stores}.<accessor>` | Scalars `committedLoads`, `committedStores`, dims `thread`, `accessor` (build v2) |
 
 `dst` is gem5's MachineID string (`Cache_12`): the destination controller's
 machine type and version.
@@ -87,7 +90,34 @@ HOV = [
     gx.StatSpec("hovLdindE2ELatency", owner_class=SEQUENCER, kind="histogram", unit="Cycle"),
     gx.StatSpec("hovLdindUnmatched", owner_class=SEQUENCER, kind="scalar"),
     gx.StatSpec("hovLdindStale", owner_class=SEQUENCER, kind="scalar"),
+    # Functional checks of hov values (sgo mods check_hov_values,
+    # sample_hov_values): all zero when the checks are off.
+    *[
+        gx.StatSpec(name, owner_class=SEQUENCER, kind="scalar", unit="Count")
+        for name in [
+            "hovValueChecks",
+            "hovValueMismatches",
+            "hovIndexChecks",
+            "hovIndexMismatches",
+            "hovChecksUnchecked",
+        ]
+    ],
 ]
+
+# Committed loads and stores per access name (the core's commit stats,
+# gem5 build v2): the insights labels in ref, the arrays' names on hov
+# uops, so the same anchor array measures work done in both variants.
+COMMITTED_PER_NAME = gx.StatSpec(
+    re.compile(
+        r"commitStats(?P<thread>\d+)\."
+        r"(?P<stat>committedLoads|committedStores)\.(?P<accessor>.+)"
+    ),
+    name="{stat}",
+    kind="scalar",
+    unit="Count",
+    dims={"thread": int},
+    doc="Committed labelled loads or stores per access name",
+)
 
 # Per access name, since gem5 build v2: hits, misses and allocated bytes
 # of every CacheMemory (`other` is an unlabelled access). hov accesses
@@ -130,4 +160,5 @@ SIFT_SPECS = [
     IND_REL_LATENCY,
     *HOV,
     *PER_NAME,
+    COMMITTED_PER_NAME,
 ]
