@@ -6,7 +6,7 @@ pass them to `RunSet.from_dirs(..., specs=SIFT_SPECS)`.
 
 | gem5 source | printed name | spec result |
 |---|---|---|
-| `CacheMemory.cc` | `usefulBytes.<accessor>` (also `read`, `write`, `resident`) | `UsefulBytes` histograms named `usefulBytes` (...), dim `accessor` |
+| `CacheMemory.cc` | `usefulBytes.<accessor>` (also `read`, `write`, `resident`, `invalidated`, `droppedEvict`) | `UsefulBytes` histograms named `usefulBytes` (...), dim `accessor` |
 | `CacheMemory.cc` | `bytesTransferred.<type>.<accessor>.<dst>` (current) | Scalar `bytesTransferred`, dims `type`, `accessor`, `dst` |
 | `CacheMemory.cc` | `bytesTransferred[<label>][<dst>]` (runs before 2026-10) | Scalar `bytesTransferred`, dims `label`, `dst` |
 | `Sequencer.cc` | `indRel{,Prod,Cons}AccLat.<consumer>[<producer>]<instance>` | Histogram `indRelAccLat`, dims `role`, `consumer`, `producer`, `instance` |
@@ -38,7 +38,8 @@ def controller_owner(dst: str, run: gx.Run) -> str:
 
 USEFUL_BYTES = gx.StatSpec(
     re.compile(
-        r"(?P<stat>usefulBytes|readUsefulBytes|writeUsefulBytes|residentUsefulBytes)"
+        r"(?P<stat>usefulBytes|readUsefulBytes|writeUsefulBytes"
+        r"|residentUsefulBytes|invalidatedUsefulBytes|droppedEvictUsefulBytes)"
         r"\.(?P<accessor>.+)"
     ),
     name="{stat}",
@@ -46,7 +47,11 @@ USEFUL_BYTES = gx.StatSpec(
     kind=UsefulBytes,
     unit="Byte",
     reduce="merge",
-    doc="Used bytes per evicted block, per accessor label",
+    doc="Used bytes per block, per accessor label: replaced (usefulBytes "
+    "and its read and write parts), still resident at the dump "
+    "(residentUsefulBytes), or invalidated without a replacement "
+    "(invalidatedUsefulBytes); droppedEvictUsefulBytes: bytes used upstream "
+    "of an eviction that reached a cache not holding the block",
 )
 
 BYTES_TRANSFERRED = gx.StatSpec(
@@ -88,6 +93,23 @@ IND_REL_LATENCY = gx.StatSpec(
 
 HOV = [
     gx.StatSpec("hovLdindE2ELatency", owner_class=SEQUENCER, kind="histogram", unit="Cycle"),
+    # The same latency split by how the uop0's DAG reached the Gather Unit
+    # (gem5 2026-10-15): its own LDIDX, merged into the drain-time
+    # notification of a line in flight, or a NotifyIndIdxReq (forwarded in
+    # the LSQ, or the register form); the three sum to the total.
+    gx.StatSpec(
+        re.compile(r"hovLdindE2ELatency(?P<kind>Leader|Merged|Notified)"),
+        name="hovLdindE2ELatencyByKind",
+        owner_class=SEQUENCER,
+        kind="histogram",
+        unit="Cycle",
+        dims={"kind": str.lower},
+    ),
+    # DAG descriptors the Gather Unit extracted, by carrier (request,
+    # notification, postEvict), on its Cache_Controller.
+    gx.StatSpec(
+        "hovDAGsByCarrier", kind="vector", unit="Count", element_dim="carrier"
+    ),
     gx.StatSpec("hovLdindUnmatched", owner_class=SEQUENCER, kind="scalar"),
     gx.StatSpec("hovLdindStale", owner_class=SEQUENCER, kind="scalar"),
     # Functional checks of hov values (sgo mods check_hov_values,
@@ -153,6 +175,28 @@ PER_NAME = [
     ]
 ]
 
+# Snoops reaching a core's topmost copy of a line (gem5 2026-10-15), per
+# access name: false sharing when the copy never used the bytes the
+# requester accesses, true sharing when it did, or no requester (a
+# prefetch, a back-invalidate); shared snoops let the requester read,
+# unique ones take the line away.
+SNOOP_SHARING = gx.StatSpec(
+    re.compile(
+        r"snoop(?P<sharing>FalseSharing|TrueSharing|NoRequester)"
+        r"(?P<snoop>Shared|Unique)\.(?P<accessor>.+)"
+    ),
+    name="snoopSharing",
+    owner_class=CACHE,
+    kind="scalar",
+    unit="Count",
+    dims={
+        "sharing": lambda s: {"FalseSharing": "false", "TrueSharing": "true",
+                              "NoRequester": "none"}[s],
+        "snoop": str.lower,
+    },
+    doc="Snoops at a core's topmost copy, by sharing and snoop kind",
+)
+
 SIFT_SPECS = [
     USEFUL_BYTES,
     BYTES_TRANSFERRED,
@@ -160,5 +204,6 @@ SIFT_SPECS = [
     IND_REL_LATENCY,
     *HOV,
     *PER_NAME,
+    SNOOP_SHARING,
     COMMITTED_PER_NAME,
 ]
