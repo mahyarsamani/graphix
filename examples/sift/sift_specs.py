@@ -111,6 +111,38 @@ HOV = [
     gx.StatSpec(
         "hovDAGsByCarrier", kind="vector", unit="Count", element_dim="carrier"
     ),
+    # In-line speculation at the Gather Unit (gem5 2026-10-15, stage 2),
+    # on its Cache_Controller: entries made, leaders by mode, speculated
+    # IDRs sent and dropped (unmapped, coalesced), real DAGs dropped as
+    # covered, cover rows replaced, writes demoted, entries coalesced.
+    *[
+        gx.StatSpec(name, kind="scalar", unit="Count")
+        for name in [
+            "hovSpecEntries",
+            "hovSpecLinesForward",
+            "hovSpecLinesLine",
+            "hovSpecIdrsSent",
+            "hovDagsCoveredAtGU",
+            "hovCoverReplaced",
+            "hovSpecWritesDemoted",
+            "hovSpecCoalesced",
+        ]
+    ],
+    gx.StatSpec(
+        "hovSpecIdrsDropped", kind="vector", unit="Count",
+        element_dim="reason"
+    ),
+    # Sequencer-side suppression (stage 3): DAGs not sent because a cover
+    # row held them (aliased onto a line in flight, notify), dropped from
+    # a drain notification, and drain notifications not sent at all.
+    gx.StatSpec(
+        "hovDagsSuppressed", owner_class=SEQUENCER, kind="vector",
+        unit="Count", element_dim="path"
+    ),
+    gx.StatSpec("hovDagsPrunedAtDrain", owner_class=SEQUENCER,
+                kind="scalar", unit="Count"),
+    gx.StatSpec("hovNotifsElided", owner_class=SEQUENCER, kind="scalar",
+                unit="Count"),
     gx.StatSpec("hovLdindUnmatched", owner_class=SEQUENCER, kind="scalar"),
     gx.StatSpec("hovLdindStale", owner_class=SEQUENCER, kind="scalar"),
     # Functional checks of hov values (sgo mods check_hov_values,
@@ -167,6 +199,10 @@ PER_NAME = [
          "Index access (uop0) misses per access name"),
         ("idrHits", "Count", "IDR hits per access name"),
         ("idrMisses", "Count", "IDR misses per access name"),
+        ("idrSpecHits", "Count",
+         "Speculated IDR hits per access name (also in idrHits)"),
+        ("idrSpecMisses", "Count",
+         "Speculated IDR misses per access name (also in idrMisses)"),
         ("gatherHits", "Count",
          "Gather Unit index line lookups with the data here"),
         ("gatherMisses", "Count",
