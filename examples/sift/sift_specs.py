@@ -7,6 +7,7 @@ pass them to `RunSet.from_dirs(..., specs=SIFT_SPECS)`.
 | gem5 source | printed name | spec result |
 |---|---|---|
 | `CacheMemory.cc` | `usefulBytes.<accessor>` (also `read`, `write`, `resident`, `invalidated`, `droppedEvict`) | `UsefulBytes` histograms named `usefulBytes` (...), dim `accessor` |
+| `CacheMemory.cc` | `{,resident}{lifetimeUsefulBytes,crossCoreUsefulBytes,lifetimeShared}.<accessor>` | `UsefulBytes` (bytes) and Histogram (shared), dims `when` (`left`, `resident`), `accessor` |
 | `CacheMemory.cc` | `bytesTransferred.<type>.<accessor>.<dst>` (current) | Scalar `bytesTransferred`, dims `type`, `accessor`, `dst` |
 | `CacheMemory.cc` | `bytesTransferred[<label>][<dst>]` (runs before 2026-10) | Scalar `bytesTransferred`, dims `label`, `dst` |
 | `Sequencer.cc` | `indRel{,Prod,Cons}AccLat.<consumer>[<producer>]<instance>` | Histogram `indRelAccLat`, dims `role`, `consumer`, `producer`, `instance` |
@@ -197,8 +198,41 @@ SNOOP_SHARING = gx.StatSpec(
     doc="Snoops at a core's topmost copy, by sharing and snoop kind",
 )
 
+# Lifetime usefulness (gem5 2026-10-15): a set that travels with a line's
+# data across caches and cores, sampled when the line leaves the chip (at
+# the home whose downstream is memory) or, for lines still on chip at the
+# dump, once per line over the union of every copy (prefix `resident`).
+# `when` is `left` or `resident`.
+def _lifetime_spec(token: str, name: str, kind, doc: str) -> gx.StatSpec:
+    return gx.StatSpec(
+        re.compile(
+            r"(?P<when>resident|)" + token + r"\.(?P<accessor>.+)"
+        ),
+        name=name,
+        owner_class=CACHE,
+        kind=kind,
+        unit="Byte" if kind is UsefulBytes else "Count",
+        reduce="merge",
+        dims={"when": lambda s: s or "left"},
+        doc=doc,
+    )
+
+
+LIFETIME = [
+    _lifetime_spec(
+        "[Ll]ifetimeUsefulBytes", "lifetimeUsefulBytes", UsefulBytes,
+        "Bytes any core used of a line over its time on chip"),
+    _lifetime_spec(
+        "[Cc]rossCoreUsefulBytes", "crossCoreUsefulBytes", UsefulBytes,
+        "Bytes only cores other than the line's first user used"),
+    _lifetime_spec(
+        "[Ll]ifetimeShared", "lifetimeShared", "histogram",
+        "1 if a core other than the line's first user used the line"),
+]
+
 SIFT_SPECS = [
     USEFUL_BYTES,
+    *LIFETIME,
     BYTES_TRANSFERRED,
     BYTES_TRANSFERRED_OLD,
     IND_REL_LATENCY,
