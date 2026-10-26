@@ -266,6 +266,47 @@ LIFETIME = [
         "1 if a core other than the line's first user used the line"),
 ]
 
+# ---------------------------------------------------------------------------
+# Wave 1 (SIFT post-QE plan, 2026-10-25): one list per work package, filled
+# from the stats each package's PLAN.md announces
+# (projects/sift/docs/agents/<date>-wp<N>/PLAN.md on branch agent/wp<N>).
+# A list stays empty, with a TODO naming the stats the package's source
+# report expects, until the package fixes the printed names; each package
+# adds its specs in the same change as its stats (wave1-common.md).
+
+# WP4 (evaluation infrastructure: controls, the memory window M0, the MMU
+# on prefetchers) adds no gem5 stat. M0 reads stock DRAM stats, which
+# graphix's built-in specs already cover (checked with runs.catalog() on
+# the WP4 smokes, 2026-10-25): readRowHits, readBursts and
+# bytesPerActivate on gem5::memory::DRAMInterface; readReqs, readBursts,
+# avgRdQLen, rdQLenPdf, numRdRetry and rdPerTurnAround on
+# gem5::memory::MemCtrl. readBursts exists on both classes, so pick one
+# with get("readBursts", owner_class=...). busUtilRead and readRowHitRate
+# are Formulas, which graphix skips: compute them from their components.
+WP4_SPECS: list = []
+
+# TODO(wp0): the target flow (F1): the Gather Unit's injected requests on
+# the Indirect Unit's behalf (issued, completed), the expect notices and
+# the waiting TBEs they allocate, data that overtook its expect (the
+# HovDeliver fallback), and hov_fetch_unique's unique fetches. Names from
+# WP0's PLAN.md once it appears on agent/wp0.
+WP0_SPECS: list = []
+
+# TODO(wp2): run-ahead dropped when the pools are full (F4: a reason of
+# hovSpecIdrsDropped, or a counter of its own) and the stream row's
+# accuracy gate (rows, used and unused run-ahead IDRs, pairs gated off).
+# Names from WP2's PLAN.md once it appears on agent/wp2.
+WP2_SPECS: list = []
+
+# TODO(wp3): IMP's own stats (spec section 5.1): index reads, patterns
+# enabled and disabled, IPD allocations and releases, per shift, indirect
+# candidates, absent index lines, translation faults, late and unused
+# prefetches per child of a MultiPrefetcher. Names from WP3's PLAN.md once
+# it appears on agent/wp3.
+WP3_SPECS: list = []
+
+WAVE1_SPECS = [*WP0_SPECS, *WP2_SPECS, *WP3_SPECS, *WP4_SPECS]
+
 SIFT_SPECS = [
     USEFUL_BYTES,
     *LIFETIME,
@@ -276,4 +317,5 @@ SIFT_SPECS = [
     *PER_NAME,
     SNOOP_SHARING,
     COMMITTED_PER_NAME,
+    *WAVE1_SPECS,
 ]
