@@ -170,7 +170,9 @@ TARGET_FLOW = [
     gx.StatSpec(
         "hovFwd", kind="vector", unit="Count", element_dim="outcome",
         doc="Requests the Gather Unit injected (issued) and how they ended: "
-        "skippedHeld, completed, declined, droppedNoTarget",
+        "skippedHeld, completed, declined, droppedNoTarget; "
+        "mergedCoreRequest: the Indirect Unit's own request merged into "
+        "one (also in completed)",
     ),
     gx.StatSpec(
         "hovFwdLatency", kind="histogram", unit="Cycle",
@@ -189,7 +191,7 @@ TARGET_FLOW = [
     gx.StatSpec(
         "hovDeliver", kind="vector", unit="Count", element_dim="outcome",
         doc="Indirect Unit: delivered blocks by outcome (intoExpect, "
-        "onArrival, declined)",
+        "onArrival, declined, intoCoreRequest)",
     ),
 ]
 
