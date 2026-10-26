@@ -15,6 +15,8 @@ pass them to `RunSet.from_dirs(..., specs=SIFT_SPECS)`.
 | `Sequencer.cc` | `hovValueChecks`, `hovValueMismatches`, `hovIndexChecks`, `hovIndexMismatches`, `hovChecksUnchecked` | Scalars (build v2) |
 | `CacheMemory.cc` | `{demand,prefetch,index,idr,gather}{Hits,Misses}.<accessor>`, `bytesAllocated.<accessor>` | Scalars, dim `accessor` (build v2) |
 | `base.cc` (O3 commit) | `commitStats<t>.committed{Loads,Stores}.<accessor>` | Scalars `committedLoads`, `committedStores`, dims `thread`, `accessor` (build v2) |
+| `indirect_memory.cc` | `imp.<counter>`, `imp.patternsEnabled::shift<s>`, `imp.indirectDistance` | Scalars, a Vector (element dim `shift`) and a Histogram on IndirectMemory prefetchers (WP3 build) |
+| `queued.cc` | `pfTranslationFailed` (nozero) | Scalar on Queued prefetchers (WP3 build) |
 
 `dst` is gem5's MachineID string (`Cache_12`): the destination controller's
 machine type and version.
@@ -266,7 +268,66 @@ LIFETIME = [
         "1 if a core other than the line's first user used the line"),
 ]
 
+# IMP's own counters (gem5 WP3, 2026-10-25), printed as
+# <prefetcher>.imp.<stat> on each IndirectMemoryPrefetcher (a child of the
+# L1D's MultiPrefetcher in the imp_v4 bundles); the prefetcher's own
+# pfIssued and pfUseful (Base) count IMP's prefetches alone there, since
+# its stream part is off. pfTranslationFailed is Queued's (nozero).
+IMP_PREFETCHER = "gem5::prefetch::IndirectMemory"
+IMP = [
+    *[
+        gx.StatSpec(
+            f"imp.{name}", owner_class=IMP_PREFETCHER, kind="scalar",
+            unit="Count", doc=doc,
+        )
+        for name, doc in [
+            ("indexReads", "PT hits whose value could be read as an index"),
+            ("indexReadsEnabled",
+             "Index reads of an enabled pattern above the threshold "
+             "(the triggers)"),
+            ("ipdAllocs", "IPD entries allocated"),
+            ("ipdReleases",
+             "IPD entries released after a third index without a match"),
+            ("ipdStolen",
+             "IPD entries whose miss tracking another entry took over"),
+            ("patternsDisabled",
+             "Confidence falling to the threshold from above"),
+            ("patternsReplaced", "PT entries with an enabled pattern replaced"),
+            ("confidenceHits",
+             "Accesses matching the target of an index in the confidence "
+             "window"),
+            ("indirectCandidates",
+             "Indirect target addresses handed to the queue"),
+            ("indirectAbsentIndexLine",
+             "Frontier walks stopped at an index line not in the cache"),
+            ("indirectPageStop",
+             "Frontier walks stopped at the end of the trigger's page"),
+            ("frontierResets",
+             "Frontier restarts because the index stream jumped"),
+            ("streamCandidates", "Candidates of IMP's own stream part"),
+            ("pendingTranslations",
+             "Prefetches waiting for a translation at the dump"),
+        ]
+    ],
+    gx.StatSpec(
+        "imp.patternsEnabled", owner_class=IMP_PREFETCHER, kind="vector",
+        unit="Count", element_dim="shift",
+        doc="Patterns found, per shift value (shift2, ..., shiftNeg3)",
+    ),
+    gx.StatSpec(
+        "imp.indirectDistance", owner_class=IMP_PREFETCHER,
+        kind="histogram", unit="Count",
+        doc="Distance in index elements of every indirect candidate",
+    ),
+    gx.StatSpec(
+        "pfTranslationFailed", owner_class="gem5::prefetch::*",
+        kind="scalar", unit="Count",
+        doc="Prefetches dropped because their translation faulted",
+    ),
+]
+
 SIFT_SPECS = [
+    *IMP,
     USEFUL_BYTES,
     *LIFETIME,
     BYTES_TRANSFERRED,
