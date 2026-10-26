@@ -13,6 +13,7 @@ pass them to `RunSet.from_dirs(..., specs=SIFT_SPECS)`.
 | `Sequencer.cc` | `indRel{,Prod,Cons}AccLat.<consumer>[<producer>]<instance>` | Histogram `indRelAccLat`, dims `role`, `consumer`, `producer`, `instance` |
 | `Sequencer.cc` | `hovLdindE2ELatency`, `hovLdindUnmatched`, `hovLdindStale` | Histogram and Scalars (current runs only) |
 | `Sequencer.cc` | `hovValueChecks`, `hovValueMismatches`, `hovIndexChecks`, `hovIndexMismatches`, `hovChecksUnchecked` | Scalars (build v2) |
+| `AbstractController.cc` | `hovFwd::<outcome>`, `hovFwdLatency`, `hovExpectSent`, `hovExpect::<outcome>`, `hovDeliver::<outcome>` | Vectors (dim `outcome`), Histogram and Scalars (the target flow, gem5 agent/wp0) |
 | `CacheMemory.cc` | `{demand,prefetch,index,idr,gather}{Hits,Misses}.<accessor>`, `bytesAllocated.<accessor>` | Scalars, dim `accessor` (build v2) |
 | `base.cc` (O3 commit) | `commitStats<t>.committed{Loads,Stores}.<accessor>` | Scalars `committedLoads`, `committedStores`, dims `thread`, `accessor` (build v2) |
 
@@ -159,6 +160,39 @@ HOV = [
     ],
 ]
 
+# The target flow (gem5 agent/wp0, 2026-10-25; projects/sift
+# docs/agents/2026-10-25-wp0/PLAN.md section 6), all nozero on a
+# Cache_Controller. Gather Unit: requests injected on the Indirect Unit's
+# behalf by outcome, cycles from injection to the Indirect Unit's CompAck,
+# and index data that named a block to expect. Indirect Unit: expects and
+# deliveries by outcome. Runs of the old flow (sift-v3) have none of these.
+TARGET_FLOW = [
+    gx.StatSpec(
+        "hovFwd", kind="vector", unit="Count", element_dim="outcome",
+        doc="Requests the Gather Unit injected (issued) and how they ended: "
+        "skippedHeld, completed, declined, droppedNoTarget",
+    ),
+    gx.StatSpec(
+        "hovFwdLatency", kind="histogram", unit="Cycle",
+        doc="Gather Unit: cycles from injecting a request to the Indirect "
+        "Unit's CompAck",
+    ),
+    gx.StatSpec(
+        "hovExpectSent", kind="scalar", unit="Count",
+        doc="Gather Unit: index data that named a data block to expect",
+    ),
+    gx.StatSpec(
+        "hovExpect", kind="vector", unit="Count", element_dim="outcome",
+        doc="Indirect Unit: expected blocks by outcome (allocated, present, "
+        "droppedNoTBE, afterData, busy, timedOut)",
+    ),
+    gx.StatSpec(
+        "hovDeliver", kind="vector", unit="Count", element_dim="outcome",
+        doc="Indirect Unit: delivered blocks by outcome (intoExpect, "
+        "onArrival, declined)",
+    ),
+]
+
 # Committed loads and stores per access name (the core's commit stats,
 # gem5 build v2): the insights labels in ref, the arrays' names on hov
 # uops, so the same anchor array measures work done in both variants.
@@ -273,6 +307,7 @@ SIFT_SPECS = [
     BYTES_TRANSFERRED_OLD,
     IND_REL_LATENCY,
     *HOV,
+    *TARGET_FLOW,
     *PER_NAME,
     SNOOP_SHARING,
     COMMITTED_PER_NAME,
