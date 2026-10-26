@@ -285,12 +285,29 @@ LIFETIME = [
 # are Formulas, which graphix skips: compute them from their components.
 WP4_SPECS: list = []
 
-# TODO(wp0): the target flow (F1): the Gather Unit's injected requests on
-# the Indirect Unit's behalf (issued, completed), the expect notices and
-# the waiting TBEs they allocate, data that overtook its expect (the
-# HovDeliver fallback), and hov_fetch_unique's unique fetches. Names from
-# WP0's PLAN.md once it appears on agent/wp0.
-WP0_SPECS: list = []
+# WP0 (the target flow, 3a/3b), from WP0's PLAN.md section 6 (agent/wp0,
+# commit 70ab712, 2026-10-25; names marked "proposed" there, so check them
+# against the merged code): on the Gather Unit's and the Indirect Unit's
+# Cache_Controller. idrHits and idrMisses (PER_NAME) move to the Gather
+# Unit and count injected requests; SendIDR and HovAck go away.
+WP0_SPECS = [
+    gx.StatSpec("hovFwd", kind="vector", unit="Count", element_dim="outcome",
+                doc="Gather Unit requests injected for the Indirect Unit: "
+                "issued, skippedHeld, completed, declined, droppedNoTarget"),
+    gx.StatSpec("hovFwdLatency", kind="histogram", unit="Cycle",
+                plots=("cdf", "box"),
+                doc="Injection to the Indirect Unit's CompAck"),
+    gx.StatSpec("hovExpectSent", kind="scalar", unit="Count",
+                doc="Expect notices attached to index data"),
+    gx.StatSpec("hovDupDropped", kind="scalar", unit="Count",
+                doc="Core requests dropped because a delivery served them"),
+    gx.StatSpec("hovExpect", kind="vector", unit="Count", element_dim="outcome",
+                doc="Expect notices at the Indirect Unit: allocated, present, "
+                "droppedNoTBE, afterData, busy, timedOut"),
+    gx.StatSpec("hovDeliver", kind="vector", unit="Count", element_dim="outcome",
+                doc="Deliveries at the Indirect Unit: intoExpect, onArrival, "
+                "absorbed, declined"),
+]
 
 # WP2 (run-ahead gate and drop-on-full), from WP2's PLAN.md section 4.5
 # (agent/wp2, commit fecc292, 2026-10-25); all nozero, on the Gather
