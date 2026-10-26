@@ -292,18 +292,88 @@ WP4_SPECS: list = []
 # WP0's PLAN.md once it appears on agent/wp0.
 WP0_SPECS: list = []
 
-# TODO(wp2): run-ahead dropped when the pools are full (F4: a reason of
-# hovSpecIdrsDropped, or a counter of its own) and the stream row's
-# accuracy gate (rows, used and unused run-ahead IDRs, pairs gated off).
-# Names from WP2's PLAN.md once it appears on agent/wp2.
-WP2_SPECS: list = []
+# WP2 (run-ahead gate and drop-on-full), from WP2's PLAN.md section 4.5
+# (agent/wp2, commit fecc292, 2026-10-25); all nozero, on the Gather
+# Unit's or the Indirect Unit's Cache_Controller. hovSpecIdrsDropped (in
+# HOV above) gains the element `full`; the vector spec reads it unchanged.
+# The per-pair vectors have one element per side-car pair entry (32).
+WP2_SPECS = [
+    *[
+        gx.StatSpec(name, kind="scalar", unit="Count", doc=doc)
+        for name, doc in [
+            ("hovSpecIdrsDroppedAtIU",
+             "Run-ahead IDRs the Indirect Unit answered with HovAck for "
+             "want of a TBE (dropped, not retried)"),
+            ("hovSpecIdrsRetriedAtIU",
+             "Run-ahead IDRs the Indirect Unit sent a RetryAck (0 with "
+             "drop-on-full)"),
+            ("hovRaRowsAllocated", "Stream rows allocated"),
+            ("hovRaRowsReplaced", "Stream rows replaced (LRU)"),
+            ("hovRaRebases", "Stream rows re-based on a jump of the index"),
+        ]
+    ],
+    *[
+        gx.StatSpec(name, kind="vector", unit="Count", element_dim="pair",
+                    doc=doc)
+        for name, doc in [
+            ("hovRaDemands", "Real DAGs seen per pair entry"),
+            ("hovRaIssued", "Run-ahead IDRs issued per pair entry"),
+            ("hovRaHits", "Run-ahead IDRs a real DAG used, per pair entry"),
+            ("hovRaGated", "Leaders the stream row's confidence gated off"),
+            ("hovRaThrottled",
+             "Leaders gated off by the accuracy back-off"),
+        ]
+    ],
+    gx.StatSpec("hovRaAccuracy", kind="histogram", unit="Percent",
+                doc="Run-ahead accuracy per epoch (one sample per epoch)"),
+    gx.StatSpec("hovRaDistance", kind="histogram", unit="Count",
+                doc="Elements of lead of each run-ahead entry over its "
+                "leader"),
+]
 
-# TODO(wp3): IMP's own stats (spec section 5.1): index reads, patterns
-# enabled and disabled, IPD allocations and releases, per shift, indirect
-# candidates, absent index lines, translation faults, late and unused
-# prefetches per child of a MultiPrefetcher. Names from WP3's PLAN.md once
-# it appears on agent/wp3.
-WP3_SPECS: list = []
+# WP3 (IMP's own stats, spec section 5.1), from WP3's PLAN.md, W3
+# (agent/wp3, commit 6f8ae45, 2026-10-25): a statistics group `imp` under
+# each IndirectMemory prefetcher, printed `<prefetcher>.imp.<stat>`, plus
+# Queued's `pfTranslationFailed` (nozero) on every queued prefetcher.
+IMP = "gem5::prefetch::IndirectMemory"
+WP3_SPECS = [
+    *[
+        gx.StatSpec(f"imp.{name}", owner_class=IMP, kind="scalar",
+                    unit="Count", doc=doc)
+        for name, doc in [
+            ("indexReads", "PT hits with a readable index value"),
+            ("indexReadsEnabled",
+             "Index reads on an enabled pattern above threshold (triggers)"),
+            ("ipdAllocs", "IPD entries allocated"),
+            ("ipdReleases", "IPD entries released without a match"),
+            ("ipdStolen", "IPD entries another PT entry took over"),
+            ("patternsDisabled", "Patterns whose confidence fell to the "
+             "threshold"),
+            ("patternsReplaced", "PT entries with an enabled pattern "
+             "evicted"),
+            ("confidenceHits", "Accesses matching an enabled pattern's "
+             "target"),
+            ("indirectCandidates", "Indirect targets handed to Queued"),
+            ("indirectAbsentIndexLine",
+             "Frontier walks stopped at an index line not in the cache"),
+            ("indirectPageStop",
+             "Frontier walks stopped at the end of the trigger's page"),
+            ("frontierResets", "Frontier restarts on an index-stream jump"),
+            ("streamCandidates", "Candidates of IMP's own stream part"),
+            ("pendingTranslations",
+             "Prefetches waiting for a translation at the dump"),
+        ]
+    ],
+    gx.StatSpec("imp.patternsEnabled", owner_class=IMP, kind="vector",
+                unit="Count", element_dim="shift",
+                doc="Patterns found, per shift_values entry"),
+    gx.StatSpec("imp.indirectDistance", owner_class=IMP, kind="histogram",
+                unit="Count", plots=("cdf", "pdf"),
+                doc="j - i of every indirect candidate, in elements"),
+    gx.StatSpec("pfTranslationFailed", owner_class="gem5::prefetch::*",
+                kind="scalar", unit="Count",
+                doc="Prefetch translations that faulted (prefetch dropped)"),
+]
 
 WAVE1_SPECS = [*WP0_SPECS, *WP2_SPECS, *WP3_SPECS, *WP4_SPECS]
 
